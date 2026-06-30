@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CIVIC.OS — Infrastructure Tracker</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+        :root {
+            --bg-main:    #06080f;
+            --bg-card:    #0d1117;
+            --bg-sidebar: #080b12;
+            --bg-elevated:#111827;
+
+            --text-main:  #f0f6ff;
+            --text-muted: #6b7a99;
+            --border:     rgba(255,255,255,0.07);
+
+            /* Neon palette */
+            --neon-orange: #ff5e1a;
+            --neon-cyan:   #00d4ff;
+            --neon-green:  #00ff88;
+            --neon-purple: #c084fc;
+            --neon-pink:   #ff2d78;
+            --neon-gold:   #ffd93d;
+
+            /* Category colors */
+            --color-street: var(--neon-orange);
+            --color-waste:  var(--neon-green);
+            --color-water:  var(--neon-cyan);
+            --color-score:  var(--neon-purple);
+
+            --gap-dynamic: clamp(1rem, 2vw, 1.75rem);
+            --radius: 1rem;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        /* ── RECYCLE RAIN ── */
+        .rain-container {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .rain-drop {
+            position: absolute;
+            top: -2.5rem;
+            color: var(--neon-green);
+            user-select: none;
+            animation: recycle-fall linear infinite;
+            /* slight blur softens the edges so it reads as ambient, not foreground */
+            filter: blur(0.4px);
+        }
+
+        @keyframes recycle-fall {
+            from { transform: translateY(-2.5rem) rotate(0deg);   }
+            to   { transform: translateY(105vh)   rotate(240deg); }
+        }
+
+        /* Push app content above the rain layer */
+        .app-container { position: relative; z-index: 1; }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg-main);
+            color: var(--text-main);
+            display: flex;
+            min-height: 100vh;
+            /* Dot-grid: subtle control-room surveillance feel */
+            background-image:
+                radial-gradient(ellipse 60% 40% at 10% 0%,  rgba(255,94,26,0.09) 0%, transparent 60%),
+                radial-gradient(ellipse 50% 40% at 90% 100%, rgba(0,212,255,0.07) 0%, transparent 60%),
+                radial-gradient(rgba(255,255,255,0.028) 1px, transparent 1px);
+            background-size: auto, auto, 26px 26px;
+        }
+
+        .app-container { display: flex; flex-wrap: wrap; width: 100%; min-height: 100vh; }
+
+        /* ── SIDEBAR ── sticky so the report button never scrolls away */
+        .sidebar {
+            flex: 1 1 240px;
+            max-width: 270px;
+            background: var(--bg-sidebar);
+            padding: 1.5rem 1.25rem;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .sidebar::after {
+            content: '';
+            position: absolute;
+            top: 0; right: -1px; bottom: 0;
+            width: 1px;
+            background: linear-gradient(180deg, var(--neon-orange) 0%, var(--neon-pink) 50%, var(--neon-cyan) 100%);
+            opacity: 0.4;
+        }
+
+        @media (max-width: 768px) { .sidebar { max-width: 100%; flex-basis: 100%; } .sidebar::after { display: none; } }
+
+        .logo {
+            font-size: 1.4rem;
+            font-weight: 900;
+            letter-spacing: -0.04em;
+            margin-bottom: 2rem;
+            background: linear-gradient(90deg, var(--neon-orange), var(--neon-pink));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .nav-links { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
+
+        .nav-item {
+            padding: 0.7rem 1rem;
+            color: var(--text-muted);
+            border-radius: 0.6rem;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+        .nav-item:hover  { background: rgba(255,255,255,0.05); color: var(--text-main); }
+        .nav-item.active { background: rgba(255,94,26,0.12); color: var(--neon-orange); }
+
+        @keyframes badge-pulse {
+            0%,100% { box-shadow: 0 0 4px var(--neon-pink); }
+            50%      { box-shadow: 0 0 9px var(--neon-pink); }
+        }
+        .new-badge {
+            display: none;
+            width: 7px; height: 7px;
+            background: var(--neon-pink);
+            border-radius: 50%;
+            margin-left: auto;
+            flex-shrink: 0;
+            animation: badge-pulse 1.8s ease-in-out infinite;
+        }
+        .new-badge.show { display: inline-block; }
+
+        /* ── SIDEBAR BOTTOM ZONE (always visible) ── */
+        .sidebar-bottom {
+            margin-top: auto;
+            padding-top: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            border-top: 1px solid var(--border);
+        }
+
+        /* Auth area — always rendered, content swaps */
+        .auth-area {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .user-pill {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            padding: 0.6rem 0.9rem;
+            background: rgba(192,132,252,0.1);
+            border: 1px solid rgba(192,132,252,0.25);
+            border-radius: 0.75rem;
+            font-size: 0.85rem;
+        }
+
+        .user-avatar {
+            width: 1.8rem; height: 1.8rem;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--neon-purple), var(--neon-pink));
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 800; font-size: 0.75rem; flex-shrink: 0;
+        }
+
+        .user-name { font-weight: 600; color: var(--neon-purple); flex: 1; }
+
+        .btn-logout {
+            background: none; border: none;
+            color: var(--text-muted); font-size: 0.75rem; cursor: pointer; padding: 0.2rem;
+            transition: color 0.15s;
+        }
+        .btn-logout:hover { color: var(--neon-pink); }
+
+        .btn-login {
+            width: 100%;
+            padding: 0.75rem;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-align: center;
+        }
+        .btn-login:hover {
+            border-color: var(--neon-purple);
+            color: var(--neon-purple);
+            background: rgba(192,132,252,0.06);
+        }
+
+        .btn-add {
+            width: 100%;
+            padding: 0.9rem;
+            background: linear-gradient(135deg, var(--neon-orange) 0%, var(--neon-pink) 100%);
+            color: white;
+            border: none;
+            border-radius: 0.75rem;
+            font-size: 1rem;
+            font-weight: 800;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            box-shadow: 0 4px 20px rgba(255,94,26,0.35);
+            transition: transform 0.15s, box-shadow 0.15s;
+            letter-spacing: 0.01em;
+        }
+        .btn-add:hover { transform: translateY(-2px); box-shadow: 0 6px 28px rgba(255,94,26,0.5); }
+
+        /* ── MAIN CONTENT ── */
+        .main-content {
+            flex: 3 1 600px;
+            padding: var(--gap-dynamic);
+            display: flex;
+            flex-direction: column;
+            gap: var(--gap-dynamic);
+        }
+
+        /* ── METRIC CARDS ── */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: var(--gap-dynamic);
+        }
+
+        .card {
+            background: var(--bg-card);
+            padding: 1.5rem;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            border-top: 3px solid var(--accent-color, var(--border));
+            box-shadow: 0 0 30px rgba(0,0,0,0.4);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 150px;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(var(--accent-rgb),0.07) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .card:hover { transform: translateY(-3px); box-shadow: 0 8px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(var(--accent-rgb),0.2); }
+
+        .card-street { --accent-color: var(--neon-orange); --accent-rgb: 255,94,26;  --card-icon: '🛣️'; }
+        .card-waste  { --accent-color: var(--neon-green);  --accent-rgb: 0,255,136;  --card-icon: '♻️'; }
+        .card-water  { --accent-color: var(--neon-cyan);   --accent-rgb: 0,212,255;  --card-icon: '💧'; }
+
+        /* Ghost watermark icon — subliminal category reminder burned into each card */
+        .card::after {
+            content: var(--card-icon, '');
+            position: absolute;
+            bottom: -0.5rem; right: 0.75rem;
+            font-size: 5rem;
+            opacity: 0.06;
+            pointer-events: none;
+            line-height: 1;
+            filter: grayscale(1);
+            transition: opacity 0.3s;
+        }
+        .card:hover::after { opacity: 0.12; }
+
+        /* Bottom colour bleed — category colour seeps up from the floor */
+        .card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 80% 50% at 50% 0%,  rgba(var(--accent-rgb),0.07) 0%, transparent 60%),
+                radial-gradient(ellipse 100% 40% at 50% 100%, rgba(var(--accent-rgb),0.1) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        /* Category tag — the named label with colour */
+        .card-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: var(--accent-color);
+            background: rgba(var(--accent-rgb), 0.1);
+            border: 1px solid rgba(var(--accent-rgb), 0.25);
+            border-radius: 9999px;
+            padding: 0.2rem 0.65rem;
+            margin-bottom: 0.6rem;
+            width: fit-content;
+        }
+
+        .card-title {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-bottom: 0.35rem;
+        }
+
+        .card-value {
+            font-size: 3rem;
+            font-weight: 900;
+            line-height: 1;
+            color: var(--accent-color, var(--text-main));
+            text-shadow: 0 0 40px rgba(var(--accent-rgb), 0.5);
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -0.03em;
+        }
+
+        /* Subliminal urgency sub-text — specific to what the number MEANS */
+        .card-sub {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin-top: 0.6rem;
+            line-height: 1.4;
+        }
+
+        /* Live pulse dot */
+        @keyframes pulse-live {
+            0%,100% { opacity: 1; transform: scale(1); }
+            50%      { opacity: 0.4; transform: scale(0.75); }
+        }
+        .live-dot {
+            display: inline-block;
+            width: 6px; height: 6px;
+            background: var(--neon-green);
+            border-radius: 50%;
+            animation: pulse-live 1.8s ease-in-out infinite;
+            box-shadow: 0 0 6px var(--neon-green);
+            vertical-align: middle;
+            margin-right: 0.3rem;
+        }
+
+        /* Compact AI status bar */
+        .ai-status-bar {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            padding: 0.5rem 0.85rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 0.6rem;
+        }
+        .ai-dot {
+            width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+            background: var(--text-muted);
+        }
+        .ai-dot.ready { background: var(--neon-green); box-shadow: 0 0 6px var(--neon-green); animation: pulse-live 2s ease-in-out infinite; }
+
+        /* ── REPORTS TABLE SECTION ── */
+        .score-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-top: 3px solid var(--neon-purple);
+            border-radius: var(--radius);
+            padding: var(--gap-dynamic);
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .section-title { font-size: 1rem; font-weight: 700; }
+        .section-sub { color: var(--text-muted); font-size: 0.8rem; margin-top: 0.2rem; }
+
+        .total-badge {
+            font-size: 2.5rem;
+            font-weight: 900;
+            color: var(--neon-purple);
+            text-shadow: 0 0 30px rgba(192,132,252,0.5);
+        }
+
+        .scoreboard-table { width: 100%; border-collapse: collapse; }
+        .scoreboard-table th,
+        .scoreboard-table td { padding: 0.85rem 1rem; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.875rem; }
+        .scoreboard-table th { color: var(--text-muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; }
+        .scoreboard-table tr:last-child td { border-bottom: none; }
+        .scoreboard-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.2rem 0.65rem;
+            border-radius: 9999px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+        .status-alert { background: rgba(255,94,26,0.15);  color: var(--neon-orange); border: 1px solid rgba(255,94,26,0.3); }
+        .status-good  { background: rgba(0,255,136,0.12);  color: var(--neon-green);  border: 1px solid rgba(0,255,136,0.25); }
+        .status-info  { background: rgba(0,212,255,0.12);  color: var(--neon-cyan);   border: 1px solid rgba(0,212,255,0.25); }
+
+        /* ── LEADERBOARD ── */
+        .leaderboard-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-top: 3px solid var(--neon-gold);
+            border-radius: var(--radius);
+            padding: var(--gap-dynamic);
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .leaderboard-row {
+            display: flex;
+            align-items: center;
+            gap: 0.9rem;
+            padding: 0.75rem 1rem;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            transition: all 0.15s;
+        }
+        .leaderboard-row:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,217,61,0.2); }
+
+        .lb-rank { font-size: 1.1rem; font-weight: 900; width: 2rem; text-align: center; flex-shrink: 0; }
+        .lb-rank-1 { color: var(--neon-gold); filter: drop-shadow(0 0 6px rgba(255,217,61,0.6)); }
+        .lb-rank-2 { color: #b0bec5; }
+        .lb-rank-3 { color: #bf8040; }
+        .lb-rank-n { color: var(--text-muted); font-size: 0.85rem; }
+
+        .lb-avatar {
+            width: 2.2rem; height: 2.2rem;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--neon-purple), var(--neon-pink));
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 800; font-size: 0.85rem; flex-shrink: 0;
+            box-shadow: 0 0 12px rgba(192,132,252,0.4);
+        }
+
+        .lb-name  { flex: 1; font-weight: 600; font-size: 0.9rem; }
+        .lb-count { font-weight: 700; font-size: 0.85rem; color: var(--neon-gold); background: rgba(255,217,61,0.1); border: 1px solid rgba(255,217,61,0.2); padding: 0.2rem 0.6rem; border-radius: 9999px; }
+
+        /* ── CROSS CONTAINER WRAPPER + LABELS ── */
+        .cross-wrapper {
+            position: relative;
+            width: fit-content;
+        }
+
+        .cat-label {
+            position: absolute;
+            font-size: 0.65rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            pointer-events: none;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            white-space: nowrap;
+            opacity: 0.75;
+        }
+
+        /* Street → images animate UP   → label: top-left corner */
+        .cat-top {
+            top: 0.75rem;
+            left: 0.85rem;
+            color: var(--neon-orange);
+        }
+        /* Infra → images animate RIGHT → label: top-right corner */
+        .cat-right {
+            top: 0.75rem;
+            right: 0.85rem;
+            color: var(--neon-purple);
+        }
+        /* Waste → images animate LEFT  → label: bottom-left corner */
+        .cat-left {
+            bottom: 0.75rem;
+            left: 0.85rem;
+            color: var(--neon-green);
+        }
+        /* Water → images animate DOWN  → label: bottom-right corner */
+        .cat-bottom {
+            bottom: 0.75rem;
+            right: 0.85rem;
+            color: var(--neon-cyan);
+        }
+
+        /* ── CROSS CONTAINER ── */
+        .cross-container {
+            display: grid;
+            isolation: isolate;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            width: 560px;
+            height: 560px;
+            flex-shrink: 0;
+            box-shadow: 0 0 60px rgba(0,0,0,0.5);
+        }
+
+        .center-axis, .image-card { grid-column: 1/-1; grid-row: 1/-1; }
+        .center-axis { display: flex; align-items: center; justify-content: center; pointer-events: none; }
+
+        .image-card {
+            margin-top: 180px; margin-left: 180px;
+            width: 150px; height: 150px;
+            border-radius: 10px; overflow: hidden;
+            border: 3px solid transparent;
+            transition: transform 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+        }
+        .image-card img { width: 100%; height: 100%; object-fit: cover; }
+        .image-card[data-cat="street"] { border-color: var(--neon-orange); box-shadow: 0 0 20px rgba(255,94,26,0.4); }
+        .image-card[data-cat="water"]  { border-color: var(--neon-cyan);   box-shadow: 0 0 20px rgba(0,212,255,0.4); }
+        .image-card[data-cat="waste"]  { border-color: var(--neon-green);  box-shadow: 0 0 20px rgba(0,255,136,0.4); }
+        .image-card[data-cat="infra"]  { border-color: var(--neon-purple); box-shadow: 0 0 20px rgba(192,132,252,0.4); }
+
+        /* ── MODALS ── */
+        .modal-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(6px);
+            z-index: 1000;
+            align-items: center; justify-content: center;
+        }
+        .modal-overlay.open { display: flex; }
+
+        .modal {
+            background: var(--bg-elevated);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 1.25rem;
+            padding: 2rem;
+            width: min(500px, 94vw);
+            max-height: 90vh;
+            overflow-y: auto;
+            display: flex; flex-direction: column; gap: 1.1rem;
+            box-shadow: 0 30px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,94,26,0.1);
+        }
+
+        .modal-header { display: flex; justify-content: space-between; align-items: center; }
+        .modal-header h2 { font-size: 1.15rem; font-weight: 800; }
+
+        .btn-close { background: none; border: 1px solid var(--border); color: var(--text-muted); font-size: 1rem; cursor: pointer; border-radius: 0.5rem; padding: 0.3rem 0.6rem; transition: all 0.15s; }
+        .btn-close:hover { border-color: var(--neon-pink); color: var(--neon-pink); }
+
+        /* Auth tabs */
+        .auth-tabs { display: flex; background: var(--bg-main); border-radius: 0.75rem; padding: 0.25rem; gap: 0.25rem; }
+        .auth-tab { flex: 1; padding: 0.6rem; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.9rem; font-weight: 600; border-radius: 0.5rem; transition: all 0.15s; }
+        .auth-tab.active { background: linear-gradient(135deg, var(--neon-orange), var(--neon-pink)); color: white; }
+
+        /* Form fields */
+        .field { display: flex; flex-direction: column; gap: 0.4rem; }
+        .field label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); font-weight: 600; }
+        .field input, .field textarea, .field select {
+            background: var(--bg-main); border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 0.6rem; color: var(--text-main);
+            padding: 0.65rem 0.9rem; font-size: 0.9rem; outline: none; width: 100%;
+            font-family: inherit; transition: border-color 0.15s;
+        }
+        .field input:focus, .field textarea:focus { border-color: var(--neon-orange); box-shadow: 0 0 0 3px rgba(255,94,26,0.1); }
+        .field textarea { resize: vertical; min-height: 75px; }
+
+        /* Drop zone */
+        .drop-zone {
+            border: 2px dashed rgba(255,255,255,0.12); border-radius: 0.75rem;
+            padding: 1.75rem; text-align: center; cursor: pointer;
+            transition: all 0.15s; position: relative;
+        }
+        .drop-zone:hover, .drop-zone.dragover { border-color: var(--neon-orange); background: rgba(255,94,26,0.04); }
+        .drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+        .drop-zone-text { color: var(--text-muted); font-size: 0.85rem; pointer-events: none; }
+        .drop-zone-text strong { color: var(--neon-orange); }
+        #imgPreview { display: none; width: 100%; max-height: 170px; object-fit: cover; border-radius: 0.5rem; margin-top: 0.75rem; }
+
+        /* Location row */
+        .location-row { display: flex; gap: 0.6rem; align-items: flex-end; }
+        .location-row .field { flex: 1; margin: 0; }
+        .btn-gps {
+            padding: 0.65rem 0.9rem; background: var(--bg-main);
+            border: 1px solid rgba(0,212,255,0.3); border-radius: 0.6rem;
+            color: var(--neon-cyan); font-size: 0.8rem; cursor: pointer;
+            white-space: nowrap; transition: all 0.15s; height: fit-content; font-weight: 600;
+        }
+        .btn-gps:hover { background: rgba(0,212,255,0.08); border-color: var(--neon-cyan); }
+
+        /* Category pill */
+        .category-pill {
+            display: inline-block; padding: 0.3rem 0.85rem; border-radius: 9999px;
+            font-size: 0.78rem; font-weight: 700; letter-spacing: 0.03em;
+            background: rgba(192,132,252,0.12); color: var(--neon-purple); border: 1px solid rgba(192,132,252,0.3);
+        }
+        .category-pill[data-cat="street_damage"]    { background: rgba(255,94,26,0.12);  color: var(--neon-orange); border-color: rgba(255,94,26,0.3); }
+        .category-pill[data-cat="water_leakage"]    { background: rgba(0,212,255,0.1);   color: var(--neon-cyan);   border-color: rgba(0,212,255,0.25); }
+        .category-pill[data-cat="waste_management"] { background: rgba(0,255,136,0.1);   color: var(--neon-green);  border-color: rgba(0,255,136,0.25); }
+        .category-pill[data-cat="other_infra"]      { background: rgba(192,132,252,0.12);color: var(--neon-purple); border-color: rgba(192,132,252,0.3); }
+
+        /* Buttons */
+        .btn-submit, .btn-auth {
+            padding: 0.85rem;
+            background: linear-gradient(135deg, var(--neon-orange) 0%, var(--neon-pink) 100%);
+            color: white; border: none; border-radius: 0.75rem;
+            font-size: 0.95rem; font-weight: 800; cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+            box-shadow: 0 4px 20px rgba(255,94,26,0.3);
+            font-family: inherit; letter-spacing: 0.02em;
+        }
+        .btn-submit:hover, .btn-auth:hover { transform: translateY(-1px); box-shadow: 0 6px 28px rgba(255,94,26,0.45); }
+        .btn-submit:disabled, .btn-auth:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        .form-msg { font-size: 0.825rem; text-align: center; min-height: 1.2em; }
+        .form-msg.success { color: var(--neon-green); }
+        .form-msg.error   { color: var(--neon-pink); }
+
+        /* removed .ai-card — replaced by .ai-status-bar */
+    </style>
+</head>
+<body>
+
+<!-- Background recycle rain — fixed, behind all UI (z-index 0) -->
+<div class="rain-container" id="rainContainer" aria-hidden="true"></div>
+<script>
+(function () {
+    const c = document.getElementById('rainContainer');
+    const COUNT = 30;
+    for (let i = 0; i < COUNT; i++) {
+        const d = document.createElement('span');
+        d.className   = 'rain-drop';
+        d.textContent = '♻';
+        // Randomise each drop: position, size, speed, delay, opacity
+        const size    = 9  + Math.random() * 11;         // 9–20 px
+        const opacity = 0.2 + Math.random() * 0.18;      // 0.20–0.38  (clearly visible)
+        const dur     = 10  + Math.random() * 12;         // 10–22 s
+        const delay   = -(Math.random() * dur);           // start anywhere in cycle
+        d.style.cssText = [
+            `left:${Math.random() * 100}%`,
+            `font-size:${size}px`,
+            `opacity:${opacity.toFixed(3)}`,
+            `animation-duration:${dur.toFixed(1)}s`,
+            `animation-delay:${delay.toFixed(1)}s`,
+        ].join(';');
+        c.appendChild(d);
+    }
+}());
+</script>
+
+<div class="app-container">
+
+    <!-- ── SIDEBAR ── -->
+    <aside class="sidebar">
+        <div>
+            <div class="logo">CIVIC.OS</div>
+            <div style="display:flex;align-items:center;gap:0.4rem;margin-top:-1.4rem;margin-bottom:1.75rem;">
+                <span class="live-dot" style="background:var(--neon-green);"></span>
+                <span style="font-size:0.62rem;font-weight:700;letter-spacing:0.14em;color:var(--neon-green);text-transform:uppercase;">System Live</span>
+            </div>
+            <ul class="nav-links">
+                <li><a class="nav-item active" href="index.html" style="text-decoration:none;">&#9632; Dashboard</a></li>
+                <li><a class="nav-item" href="analytics.html" style="text-decoration:none;">&#9651; Analytics</a></li>
+                <li><a class="nav-item" href="gallery.html" style="text-decoration:none;">&#9728; Gallery<span class="new-badge" id="galleryBadge"></span></a></li>
+                <li><a class="nav-item" href="map.html" style="text-decoration:none;">&#9678; Regional Map</a></li>
+            </ul>
+        </div>
+
+        <!-- Always-visible bottom zone -->
+        <div class="sidebar-bottom">
+
+            <!-- Auth area — always rendered, JS swaps content -->
+            <div class="auth-area" id="authArea">
+                <!-- Logged-out state (default) -->
+                <button class="btn-login" id="openAuthBtn">&#128274; Login / Sign Up</button>
+            </div>
+
+            <button class="btn-add" id="openModalBtn">&#43; File a Report</button>
+        </div>
+    </aside>
+
+    <!-- ── MAIN DASHBOARD ── -->
+    <main class="main-content">
+
+        <!-- Metrics -->
+        <section class="metrics-grid">
+            <div class="card card-street">
+                <div class="card-tag">🛣️ Street Damage</div>
+                <div class="card-title">Active Incidents</div>
+                <div class="card-value" id="stat-street">—</div>
+                <div class="card-sub"><span class="live-dot"></span>Damaged roads, potholes &amp; cracks</div>
+            </div>
+            <div class="card card-waste">
+                <div class="card-tag">♻️ Waste Management</div>
+                <div class="card-title">Active Incidents</div>
+                <div class="card-value" id="stat-waste">—</div>
+                <div class="card-sub"><span class="live-dot"></span>Illegal dumping &amp; sanitation failures</div>
+            </div>
+            <div class="card card-water">
+                <div class="card-tag">💧 Water Leakage</div>
+                <div class="card-title">Active Incidents</div>
+                <div class="card-value" id="stat-water">—</div>
+                <div class="card-sub"><span class="live-dot"></span>Pipe bursts, seepage &amp; flooding</div>
+            </div>
+        </section>
+
+        <!-- Reports Table -->
+        <section class="score-section">
+            <div class="section-header">
+                <div>
+                    <div class="section-title"><span class="live-dot"></span>Recent Reports</div>
+                    <div class="section-sub">Live feed — community submissions across all categories</div>
+                </div>
+                <div class="total-badge" id="stat-total">—</div>
+            </div>
+            <div style="overflow-x:auto;">
+                <table class="scoreboard-table">
+                    <thead>
+                        <tr>
+                            <th>Reporter</th>
+                            <th>Category</th>
+                            <th>Location</th>
+                            <th>Status</th>
+                            <th>When</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reportTableBody">
+                        <tr><td colspan="5" style="color:var(--text-muted);text-align:center;padding:2rem;">Loading…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Leaderboard -->
+        <section class="leaderboard-section">
+            <div class="section-header">
+                <div>
+                    <div class="section-title">&#127942; Top Reporters</div>
+                    <div class="section-sub">Community members by report count</div>
+                </div>
+            </div>
+            <div id="leaderboardList">
+                <div style="color:var(--text-muted);font-size:0.875rem;text-align:center;padding:1rem;">Loading…</div>
+            </div>
+        </section>
+
+        <!-- Category Visual -->
+        <div class="cross-wrapper">
+            <div class="cat-label cat-top">🛣️ Street Damage</div>
+            <div class="cat-label cat-left">♻️ Waste</div>
+            <div class="cat-label cat-right">🏗️ Infra</div>
+            <div class="cat-label cat-bottom">💧 Water Leakage</div>
+            <div class="cross-container" id="container"></div>
+        </div>
+
+        <!-- Compact AI status bar -->
+        <div class="ai-status-bar">
+            <span class="ai-dot" id="aiDot"></span>
+            <span id="status">Loading image classifier…</span>
+        </div>
+
+    </main>
+</div>
+
+<!-- ══ AUTH MODAL ══ -->
+<div class="modal-overlay" id="authOverlay">
+    <div class="modal" style="max-width:400px;">
+        <div class="modal-header">
+            <h2 id="authTitle">Welcome to CIVIC.OS</h2>
+            <button class="btn-close" id="closeAuthBtn">&#x2715;</button>
+        </div>
+        <div class="auth-tabs">
+            <button class="auth-tab active" id="tabLogin" onclick="switchTab('login')">Login</button>
+            <button class="auth-tab" id="tabSignup" onclick="switchTab('signup')">Sign Up</button>
+        </div>
+        <div class="field">
+            <label>Username</label>
+            <input type="text" id="authUsername" placeholder="e.g. civic_hero" autocomplete="username">
+        </div>
+        <div class="field">
+            <label>Password</label>
+            <input type="password" id="authPassword" placeholder="Min 6 characters" autocomplete="current-password">
+        </div>
+        <button class="btn-auth" id="authSubmitBtn">Login</button>
+        <div class="form-msg" id="authMsg"></div>
+    </div>
+</div>
+
+<!-- ══ REPORT MODAL ══ -->
+<div class="modal-overlay" id="reportOverlay">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>File a New Report</h2>
+            <button class="btn-close" id="closeReportBtn">&#x2715;</button>
+        </div>
+
+        <div class="drop-zone" id="dropZone">
+            <input type="file" id="modalImageInput" accept="image/*">
+            <div class="drop-zone-text">
+                <strong>Click to upload</strong> or drag image here<br>
+                <span style="font-size:0.75rem;margin-top:0.3rem;display:block;">PNG, JPG, WEBP — max 10 MB</span>
+            </div>
+            <img id="imgPreview" alt="Preview">
+        </div>
+
+        <div id="aiModalStatus" style="font-size:0.8rem;color:var(--text-muted);">Upload an image to auto-detect its category.</div>
+
+        <div class="field">
+            <label>Category <span id="aiCatHint" style="color:var(--neon-green);font-weight:400;font-size:0.7rem;letter-spacing:0;text-transform:none;"></span></label>
+            <select id="categoryInput">
+                <option value="">— Upload image or pick manually —</option>
+                <option value="street_damage">🛣️ Street Damage</option>
+                <option value="water_leakage">💧 Water Leakage</option>
+                <option value="waste_management">♻️ Waste Management</option>
+                <option value="other_infra">🏗️ Other Infrastructure</option>
+            </select>
+        </div>
+
+        <div class="field">
+            <label>Location</label>
+            <div class="location-row">
+                <div class="field" style="margin:0;">
+                    <input type="text" id="addressInput" placeholder="Type address and press Enter or click Find">
+                </div>
+                <button class="btn-gps" id="geocodeBtn" type="button">&#128269; Find</button>
+                <button class="btn-gps" id="gpsBtn" type="button">&#128205; GPS</button>
+            </div>
+            <input type="hidden" id="latInput">
+            <input type="hidden" id="lngInput">
+            <div id="gpsStatus" style="font-size:0.75rem;color:var(--neon-cyan);margin-top:0.3rem;"></div>
+        </div>
+
+        <div class="field">
+            <label>Description <span style="color:var(--text-muted);font-weight:400;">(optional)</span></label>
+            <textarea id="descInput" placeholder="Describe the issue briefly…"></textarea>
+        </div>
+
+        <button class="btn-submit" id="submitBtn" disabled>Submit Report</button>
+        <div class="form-msg" id="submitMsg"></div>
+    </div>
+</div>
+
+<!-- ══ STATIC ANIMATION ══ -->
+<script>
+    const imageData = [
+        { cat:"street", src:"https://img.magnific.com/premium-photo/damaged-asphalt-road-with-deep-pothole-american-highway-surface-ruined-roadway-urgent-need-repair_127089-31444.jpg?w=2000" },
+        { cat:"water",  src:"https://images.pexels.com/photos/8751911/pexels-photo-8751911.jpeg?cs=srgb&dl=pexels-sanket-photography-23512190-8751911.jpg&fm=jpg" },
+        { cat:"waste",  src:"https://upload.wikimedia.org/wikipedia/commons/6/69/Chispita_666%2C_Poor_Children_Rummaging_through_Trash_Cans.jpg" },
+        { cat:"infra",  src:"https://www.wpr.org/wp-content/uploads/2025/08/MKECLEAN3-scaled.jpg" },
+        { cat:"street", src:"https://static.toiimg.com/thumb/msid-94472764,imgsize-125938,width-1000,height-562,resizemode-8/94472764.jpg" },
+        { cat:"water",  src:"https://www.mthomaswater.co.uk/ckfinder/userfiles/images/layerslider13.jpg" },
+        { cat:"water",  src:"https://i.imgur.com/jyPDiWX.gif" }
+    ];
+    const container = document.getElementById('container');
+    const counters = { street:0, water:0, waste:0, infra:0 };
+    imageData.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'image-card';
+        card.setAttribute('data-cat', item.cat);
+        card.innerHTML = `<img src="${item.src}" alt="${item.cat}">`;
+        container.appendChild(card);
+    });
+    document.querySelectorAll('.image-card').forEach((card, i) => {
+        const cat = card.getAttribute('data-cat');
+        const si = counters[cat]++;
+        const cats = { street:0, water:0, waste:0, infra:0 };
+        document.querySelectorAll('.image-card').forEach(el => { const c=el.getAttribute('data-cat'); if(c in cats) cats[c]++; });
+        const max = Math.max(...Object.values(cats));
+        const off = si * (36 / max);
+        let x=0,y=0;
+        if(cat==='street') y=-(180+off);
+        if(cat==='water')  y= (180+off);
+        if(cat==='waste')  x=-(180+off);
+        if(cat==='infra')  x= (180+off);
+        // Newest card = highest z-index (on top). Last item in array stays behind.
+        const isLastStatic = i === imageData.length - 1;
+        setTimeout(()=>{ card.style.transform=`translate(${x}px,${y}px)`; card.style.zIndex = isLastStatic ? 0 : si + 1; }, i*1400);
+    });
+</script>
+
+<!-- ══ AUTH ══ -->
+<script>
+    let _token    = localStorage.getItem('civic_token')    || '';
+    let _username = localStorage.getItem('civic_username') || '';
+    let _pendingReport = false;
+
+    function renderAuthArea() {
+        const area = document.getElementById('authArea');
+        if (_token) {
+            area.innerHTML = `
+                <div class="user-pill">
+                    <div class="user-avatar">${_username.charAt(0).toUpperCase()}</div>
+                    <span class="user-name">${_username}</span>
+                    <button class="btn-logout" id="logoutBtn" title="Log out">&#x2715;</button>
+                </div>
+                <button class="btn-login" id="openAuthBtn" style="font-size:0.78rem;color:var(--text-muted);">&#128274; Switch account</button>
+            `;
+            document.getElementById('logoutBtn').addEventListener('click', () => {
+                _token = ''; _username = '';
+                localStorage.removeItem('civic_token');
+                localStorage.removeItem('civic_username');
+                renderAuthArea();
+            });
+        } else {
+            area.innerHTML = `<button class="btn-login" id="openAuthBtn">&#128274; Login / Sign Up</button>`;
+        }
+        document.getElementById('openAuthBtn').addEventListener('click', () => openAuth(false));
+    }
+
+    renderAuthArea();
+
+    let _authMode = 'login';
+
+    function openAuth(afterLogin) {
+        _pendingReport = !!afterLogin;
+        document.getElementById('authOverlay').classList.add('open');
+        setTimeout(() => document.getElementById('authUsername').focus(), 50);
+    }
+
+    function closeAuth() {
+        document.getElementById('authOverlay').classList.remove('open');
+        document.getElementById('authMsg').textContent = '';
+        document.getElementById('authUsername').value = '';
+        document.getElementById('authPassword').value = '';
+    }
+
+    function switchTab(mode) {
+        _authMode = mode;
+        document.getElementById('tabLogin').classList.toggle('active', mode==='login');
+        document.getElementById('tabSignup').classList.toggle('active', mode==='signup');
+        document.getElementById('authSubmitBtn').textContent = mode==='login' ? 'Login' : 'Create Account';
+        document.getElementById('authTitle').textContent = mode==='login' ? 'Welcome Back' : 'Create Account';
+        document.getElementById('authMsg').textContent = '';
+    }
+
+    document.getElementById('closeAuthBtn').addEventListener('click', closeAuth);
+    document.getElementById('authOverlay').addEventListener('click', e => { if(e.target===document.getElementById('authOverlay')) closeAuth(); });
+
+    document.getElementById('authSubmitBtn').addEventListener('click', async () => {
+        const username = document.getElementById('authUsername').value.trim();
+        const password = document.getElementById('authPassword').value;
+        const msgEl = document.getElementById('authMsg');
+        const btn   = document.getElementById('authSubmitBtn');
+        if (!username || !password) { msgEl.textContent='Fill in both fields.'; msgEl.className='form-msg error'; return; }
+        btn.disabled = true;
+        msgEl.textContent = _authMode==='login' ? 'Logging in…' : 'Creating account…';
+        msgEl.className = 'form-msg';
+        try {
+            const res  = await fetch(`/api/auth/${_authMode}`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username,password}) });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Something went wrong');
+            _token    = data.token;
+            _username = data.username;
+            localStorage.setItem('civic_token',    _token);
+            localStorage.setItem('civic_username', _username);
+            renderAuthArea();
+            closeAuth();
+            if (_pendingReport) openReportModal();
+        } catch(e) { msgEl.textContent=e.message; msgEl.className='form-msg error'; }
+        finally    { btn.disabled=false; }
+    });
+
+    ['authUsername','authPassword'].forEach(id => {
+        document.getElementById(id).addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('authSubmitBtn').click(); });
+    });
+</script>
+
+<!-- ══ REPORT MODAL ══ -->
+<script>
+    let pendingFile = null;
+
+    const CAT_LABELS = { street_damage:'Street Damage', water_leakage:'Water Leakage', waste_management:'Waste Management', other_infra:'Other Infrastructure' };
+
+    function openReportModal()  { document.getElementById('reportOverlay').classList.add('open'); }
+    function closeReportModal() { document.getElementById('reportOverlay').classList.remove('open'); resetReport(); }
+
+    function resetReport() {
+        document.getElementById('modalImageInput').value = '';
+        document.getElementById('imgPreview').style.display = 'none';
+        document.getElementById('imgPreview').src = '';
+        document.getElementById('aiModalStatus').textContent = 'Upload an image to auto-detect its category.';
+        document.getElementById('aiCatHint').textContent = '';
+        document.getElementById('categoryInput').value = '';
+        document.getElementById('latInput').value = '';
+        document.getElementById('lngInput').value = '';
+        document.getElementById('gpsStatus').textContent = '';
+        document.getElementById('addressInput').value = '';
+        document.getElementById('descInput').value = '';
+        document.getElementById('submitMsg').textContent = '';
+        document.getElementById('submitBtn').disabled = true;
+        pendingFile = null;
+    }
+
+    document.getElementById('openModalBtn').addEventListener('click', () => {
+        if (!_token) { openAuth(true); return; }
+        openReportModal();
+    });
+    document.getElementById('closeReportBtn').addEventListener('click', closeReportModal);
+    document.getElementById('reportOverlay').addEventListener('click', e => { if(e.target===document.getElementById('reportOverlay')) closeReportModal(); });
+
+    const dropZone = document.getElementById('dropZone');
+    dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); if(e.dataTransfer.files[0]) handleImg(e.dataTransfer.files[0]); });
+    document.getElementById('modalImageInput').addEventListener('change', e => { if(e.target.files[0]) handleImg(e.target.files[0]); });
+
+    // Enable submit whenever both image and category are present
+    document.getElementById('categoryInput').addEventListener('change', () => {
+        document.getElementById('submitBtn').disabled = !pendingFile || !document.getElementById('categoryInput').value;
+        document.getElementById('aiCatHint').textContent = '';  // clear AI hint if user overrides
+    });
+
+    function handleImg(file) {
+        pendingFile = file;
+        const url = URL.createObjectURL(file);
+        const prev = document.getElementById('imgPreview');
+        prev.src = url; prev.style.display = 'block';
+        document.getElementById('aiModalStatus').textContent = 'Analyzing image with AI…';
+        document.getElementById('aiCatHint').textContent = '';
+        document.getElementById('categoryInput').value = '';
+        document.getElementById('submitBtn').disabled = true;
+
+        classifyImage(url).then(cat => {
+            document.getElementById('categoryInput').value = cat;
+            document.getElementById('aiModalStatus').textContent = 'Category auto-detected — you can change it below.';
+            document.getElementById('aiCatHint').textContent = '✦ AI suggested';
+            document.getElementById('submitBtn').disabled = false;
+        }).catch(() => {
+            document.getElementById('aiModalStatus').textContent = 'Could not auto-detect — please select manually.';
+            document.getElementById('submitBtn').disabled = !document.getElementById('categoryInput').value;
+        });
+    }
+
+    // Geocode typed address → lat/lng via Nominatim (free, no API key)
+    async function doGeocode() {
+        const addr = document.getElementById('addressInput').value.trim();
+        if (!addr) return;
+        const statusEl = document.getElementById('gpsStatus');
+        statusEl.style.color = 'var(--text-muted)';
+        statusEl.textContent = 'Searching…';
+        try {
+            const res  = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addr)}&format=json&limit=1&addressdetails=0`);
+            const data = await res.json();
+            if (!data.length) {
+                statusEl.style.color = 'var(--neon-pink)';
+                statusEl.textContent = 'Address not found — try a more specific query.';
+                return;
+            }
+            document.getElementById('latInput').value = parseFloat(data[0].lat).toFixed(6);
+            document.getElementById('lngInput').value = parseFloat(data[0].lon).toFixed(6);
+            // Show a trimmed version of the matched display name
+            const parts = data[0].display_name.split(',');
+            const short = parts.slice(0, 3).join(',').trim();
+            statusEl.style.color = 'var(--neon-cyan)';
+            statusEl.textContent = `\u2713 Matched: ${short}`;
+        } catch(_) {
+            statusEl.style.color = 'var(--neon-pink)';
+            statusEl.textContent = 'Geocoding failed — use GPS instead.';
+        }
+    }
+
+    document.getElementById('geocodeBtn').addEventListener('click', doGeocode);
+    document.getElementById('addressInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); doGeocode(); }
+    });
+    // Clear stale coordinates if user edits the address after geocoding
+    document.getElementById('addressInput').addEventListener('input', () => {
+        document.getElementById('latInput').value  = '';
+        document.getElementById('lngInput').value  = '';
+        document.getElementById('gpsStatus').textContent = '';
+    });
+
+    document.getElementById('gpsBtn').addEventListener('click', () => {
+        if (!navigator.geolocation) { document.getElementById('gpsStatus').textContent='Not supported.'; return; }
+        const statusEl = document.getElementById('gpsStatus');
+        statusEl.style.color = 'var(--text-muted)';
+        statusEl.textContent = 'Getting location…';
+        navigator.geolocation.getCurrentPosition(
+            p => {
+                document.getElementById('latInput').value  = p.coords.latitude.toFixed(6);
+                document.getElementById('lngInput').value  = p.coords.longitude.toFixed(6);
+                statusEl.style.color   = 'var(--neon-cyan)';
+                statusEl.textContent   = `\u2713 ${p.coords.latitude.toFixed(4)}, ${p.coords.longitude.toFixed(4)}`;
+            },
+            () => { statusEl.style.color='var(--neon-pink)'; statusEl.textContent='Location access denied.'; }
+        );
+    });
+
+    document.getElementById('submitBtn').addEventListener('click', async () => {
+        if (!pendingFile || !document.getElementById('categoryInput').value) return;
+        const btn=document.getElementById('submitBtn'), msgEl=document.getElementById('submitMsg');
+        btn.disabled=true; msgEl.textContent='Uploading…'; msgEl.className='form-msg';
+        const fd=new FormData();
+        fd.append('image', pendingFile, pendingFile.name);
+        fd.append('category', document.getElementById('categoryInput').value);
+        const addr=document.getElementById('addressInput').value.trim();
+        const desc=document.getElementById('descInput').value.trim();
+        const lat=document.getElementById('latInput').value, lng=document.getElementById('lngInput').value;
+        if(addr) fd.append('address',addr); if(desc) fd.append('description',desc);
+        if(lat)  fd.append('latitude',lat); if(lng)  fd.append('longitude',lng);
+        try {
+            const res=await fetch('/api/reports',{method:'POST',headers:{'Authorization':'Bearer '+_token},body:fd});
+            if(!res.ok){ const e=await res.json().catch(()=>({})); if(res.status===401){closeReportModal();openAuth(true);return;} throw new Error(e.detail||`Error ${res.status}`); }
+            const submitted = await res.json();
+            msgEl.textContent='Report submitted!'; msgEl.className='form-msg success';
+            loadStats(); loadReports(); loadLeaderboard();
+            if (submitted.image_url) addImageToContainer(submitted.image_url, submitted.category);
+            setTimeout(closeReportModal, 1200);
+        } catch(e){ msgEl.textContent=e.message; msgEl.className='form-msg error'; btn.disabled=false; }
+    });
+
+    // Injects a newly uploaded image on top of its category stack in the cross-container
+    const CAT_KEY = { street_damage:'street', water_leakage:'water', waste_management:'waste', other_infra:'infra' };
+
+    function addImageToContainer(imageUrl, category) {
+        const catKey = CAT_KEY[category];
+        if (!catKey) return;
+
+        const cont = document.getElementById('container');
+        const card = document.createElement('div');
+        card.className = 'image-card';
+        card.setAttribute('data-cat', catKey);
+        card.innerHTML = `<img src="${imageUrl}" alt="${catKey}" loading="lazy">`;
+        cont.appendChild(card);
+
+        // Count cards per category after adding the new one
+        const cats = { street:0, water:0, waste:0, infra:0 };
+        cont.querySelectorAll('.image-card').forEach(el => { const c=el.getAttribute('data-cat'); if(c in cats) cats[c]++; });
+        const max = Math.max(...Object.values(cats));
+        const si  = cats[catKey] - 1;   // 0-based stack index for the new card
+        const off = si * (36 / max);
+
+        let x=0, y=0;
+        if(catKey==='street') y=-(180+off);
+        if(catKey==='water')  y= (180+off);
+        if(catKey==='waste')  x=-(180+off);
+        if(catKey==='infra')  x= (180+off);
+
+        // Place it on top of its category stack
+        card.style.zIndex = si + 10;
+        requestAnimationFrame(() => { card.style.transform = `translate(${x}px,${y}px)`; });
+    }
+</script>
+
+<!-- ══ LIVE DATA ══ -->
+<script>
+    const STATUS_BADGE = {
+        open:        '<span class="status-badge status-alert">Open</span>',
+        in_progress: '<span class="status-badge status-info">In Progress</span>',
+        resolved:    '<span class="status-badge status-good">Resolved</span>',
+    };
+
+    async function loadStats() {
+        try {
+            const d=await fetch('/api/reports/stats').then(r=>r.json());
+            document.getElementById('stat-street').textContent=d.street_damage;
+            document.getElementById('stat-waste').textContent=d.waste_management;
+            document.getElementById('stat-water').textContent=d.water_leakage;
+            document.getElementById('stat-total').textContent=d.total;
+        } catch(_){}
+    }
+
+    function checkGalleryBadge(reports) {
+        const lastVisit = parseInt(localStorage.getItem('gallery_last_visit') || '0', 10);
+        const cutoff    = Date.now() - 24 * 60 * 60 * 1000; // within 24 h
+        const hasNew    = reports.some(r => {
+            const t = new Date(r.created_at).getTime();
+            return t > cutoff && t > lastVisit;
+        });
+        const badge = document.getElementById('galleryBadge');
+        if (badge) badge.classList.toggle('show', hasNew);
+    }
+
+    async function loadReports() {
+        try {
+            const rows=await fetch('/api/reports?limit=10').then(r=>r.json());
+            checkGalleryBadge(rows);
+            const tb=document.getElementById('reportTableBody');
+            if(!rows.length){ tb.innerHTML='<tr><td colspan="5" style="color:var(--text-muted);text-align:center;padding:2rem;">No reports yet — file the first one!</td></tr>'; return; }
+            tb.innerHTML=rows.map(r=>`<tr>
+                <td style="font-weight:700;color:var(--neon-purple);">${r.username||'—'}</td>
+                <td>${CAT_LABELS[r.category]||r.category}</td>
+                <td style="color:var(--text-muted);font-size:0.8rem;">${r.address||(r.latitude?`${(+r.latitude).toFixed(3)},${(+r.longitude).toFixed(3)}`:'—')}</td>
+                <td>${STATUS_BADGE[r.status]||r.status}</td>
+                <td style="color:var(--text-muted);font-size:0.78rem;">${new Date(r.created_at).toLocaleString()}</td>
+            </tr>`).join('');
+        } catch(_){}
+    }
+
+    async function loadLeaderboard() {
+        try {
+            const data=await fetch('/api/reports/leaderboard?limit=10').then(r=>r.json());
+            const el=document.getElementById('leaderboardList');
+            if(!data.length){ el.innerHTML='<div style="color:var(--text-muted);text-align:center;padding:1rem;font-size:0.875rem;">No reports yet!</div>'; return; }
+            const MEDALS=['&#127945;','&#129352;','&#129353;'];
+            el.innerHTML=data.map((e,i)=>`
+                <div class="leaderboard-row">
+                    <div class="lb-rank ${i<3?'lb-rank-'+(i+1):'lb-rank-n'}">${i<3?MEDALS[i]:'#'+(i+1)}</div>
+                    <div class="lb-avatar">${e.username.charAt(0).toUpperCase()}</div>
+                    <div class="lb-name">${e.username}</div>
+                    <div class="lb-count">${e.count} report${e.count!==1?'s':''}</div>
+                </div>`).join('');
+        } catch(_){}
+    }
+
+    loadStats(); loadReports(); loadLeaderboard();
+</script>
+
+<!-- ══ AI ══ -->
+<script type="module">
+    import { pipeline, env } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers";
+    env.allowRemoteModels=true; env.allowLocalModels=false; env.localModelPath='';
+
+    const CATEGORY_MAP={
+        pothole:'street_damage',street:'street_damage',asphalt:'street_damage',road:'street_damage',
+        leak:'water_leakage',water:'water_leakage',pipe:'water_leakage',stream:'water_leakage',
+        garbage:'waste_management',trash:'waste_management',waste:'waste_management',dump:'waste_management',
+        bridge:'other_infra',building:'other_infra',structure:'other_infra',
+    };
+
+    let classifier=null;
+
+    async function initAI() {
+        try {
+            classifier=await pipeline('image-classification','Xenova/vit-base-patch16-224');
+            document.getElementById('status').textContent='AI classifier ready — auto-categorises uploaded images';
+            document.getElementById('aiDot').classList.add('ready');
+        } catch(e) {
+            document.getElementById('status').textContent='AI unavailable: '+e.message;
+        }
+    }
+
+    window.classifyImage=async function(url) {
+        if(!classifier) throw new Error('AI not ready');
+        const out=await classifier(url);
+        for(const p of out){ const l=p.label.toLowerCase(); for(const k in CATEGORY_MAP) if(l.includes(k)) return CATEGORY_MAP[k]; }
+        return 'other_infra';
+    };
+
+    initAI();
+</script>
+
+</body>
+</html>

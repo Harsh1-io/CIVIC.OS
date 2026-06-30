@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="pin" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff5e1a"/>
+      <stop offset="100%" stop-color="#ff2d78"/>
+    </linearGradient>
+  </defs>
+  <!-- Dark rounded background -->
+  <rect width="32" height="32" rx="7" fill="#0d1117"/>
+  <!-- Map pin body -->
+  <path d="M16 4C11.03 4 7 8.03 7 13c0 7 9 15 9 15s9-8 9-15c0-4.97-4.03-9-9-9z" fill="url(#pin)"/>
+  <!-- Inner circle cutout -->
+  <circle cx="16" cy="13" r="3.6" fill="#0d1117"/>
+  <!-- Crack / damage mark inside (pothole indicator) -->
+  <path d="M15.2 11.5l1.1 1.8-1.6 0.4 1.9 1.8" stroke="#ff5e1a" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.85"/>
+</svg>

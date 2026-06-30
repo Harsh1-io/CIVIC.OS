@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CIVIC.OS — Analytics</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+        :root {
+            --bg-main:     #06080f;
+            --bg-card:     #0d1117;
+            --bg-sidebar:  #080b12;
+            --bg-elevated: #111827;
+            --text-main:   #f0f6ff;
+            --text-muted:  #6b7a99;
+            --border:      rgba(255,255,255,0.07);
+            --neon-orange: #ff5e1a;
+            --neon-cyan:   #00d4ff;
+            --neon-green:  #00ff88;
+            --neon-purple: #c084fc;
+            --neon-pink:   #ff2d78;
+            --neon-gold:   #ffd93d;
+            --radius:      1rem;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { height: 100%; }
+        body {
+            height: 100%;
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg-main);
+            color: var(--text-main);
+            overflow: hidden;
+            display: flex;
+        }
+
+        .app-container { display: flex; width: 100%; height: 100vh; overflow: hidden; }
+
+        /* ── SIDEBAR ── */
+        .sidebar {
+            flex: 0 0 270px;
+            background: var(--bg-sidebar);
+            padding: 1.5rem 1.25rem;
+            display: flex; flex-direction: column;
+            border-right: 1px solid var(--border);
+            position: relative;
+            height: 100vh; overflow-y: auto;
+            z-index: 10;
+        }
+        .sidebar::after {
+            content: '';
+            position: absolute;
+            top: 0; right: -1px; bottom: 0; width: 1px;
+            background: linear-gradient(180deg, var(--neon-orange) 0%, var(--neon-pink) 50%, var(--neon-cyan) 100%);
+            opacity: 0.4;
+        }
+        .logo {
+            font-size: 1.4rem; font-weight: 900; letter-spacing: -0.04em; margin-bottom: 0.3rem;
+            background: linear-gradient(90deg, var(--neon-orange), var(--neon-pink));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        .nav-links { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.5rem; }
+        .nav-item {
+            padding: 0.7rem 1rem; color: var(--text-muted); border-radius: 0.6rem;
+            font-size: 0.9rem; font-weight: 500; transition: all 0.15s;
+            display: flex; align-items: center; gap: 0.6rem; text-decoration: none;
+        }
+        .nav-item:hover  { background: rgba(255,255,255,0.05); color: var(--text-main); }
+        .nav-item.active { background: rgba(0,255,136,0.1); color: var(--neon-green); }
+
+        @keyframes badge-pulse {
+            0%,100% { box-shadow: 0 0 4px #ff2d78; }
+            50%      { box-shadow: 0 0 9px #ff2d78; }
+        }
+        .new-badge {
+            display: none; width: 7px; height: 7px;
+            background: #ff2d78; border-radius: 50%;
+            margin-left: auto; flex-shrink: 0;
+            animation: badge-pulse 1.8s ease-in-out infinite;
+        }
+        .new-badge.show { display: inline-block; }
+
+        .sidebar-bottom {
+            margin-top: auto; padding-top: 1.5rem;
+            display: flex; flex-direction: column; gap: 0.75rem;
+            border-top: 1px solid var(--border);
+        }
+        .auth-area { display: flex; flex-direction: column; gap: 0.5rem; }
+        .user-pill {
+            display: flex; align-items: center; gap: 0.65rem; padding: 0.6rem 0.9rem;
+            background: rgba(192,132,252,0.1); border: 1px solid rgba(192,132,252,0.25);
+            border-radius: 0.75rem; font-size: 0.85rem;
+        }
+        .user-avatar {
+            width: 1.8rem; height: 1.8rem; border-radius: 50%;
+            background: linear-gradient(135deg, var(--neon-purple), var(--neon-pink));
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 800; font-size: 0.75rem; flex-shrink: 0;
+        }
+        .user-name  { font-weight: 600; color: var(--neon-purple); flex: 1; }
+        .btn-logout { background: none; border: none; color: var(--text-muted); font-size: 0.75rem; cursor: pointer; transition: color 0.15s; }
+        .btn-logout:hover { color: var(--neon-pink); }
+        .btn-login {
+            width: 100%; padding: 0.75rem;
+            background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+            border-radius: 0.75rem; color: var(--text-muted);
+            font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.15s; text-align: center;
+        }
+        .btn-login:hover { border-color: var(--neon-purple); color: var(--neon-purple); background: rgba(192,132,252,0.06); }
+        .btn-add {
+            width: 100%; padding: 0.9rem;
+            background: linear-gradient(135deg, var(--neon-orange) 0%, var(--neon-pink) 100%);
+            color: white; border: none; border-radius: 0.75rem;
+            font-size: 1rem; font-weight: 800; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+            box-shadow: 0 4px 20px rgba(255,94,26,0.35);
+            transition: transform 0.15s, box-shadow 0.15s; text-decoration: none;
+        }
+        .btn-add:hover { transform: translateY(-2px); box-shadow: 0 6px 28px rgba(255,94,26,0.5); }
+
+        @keyframes pulse-live {
+            0%,100% { opacity:1; transform:scale(1); }
+            50%      { opacity:0.4; transform:scale(0.75); }
+        }
+        .live-dot {
+            display: inline-block; width: 6px; height: 6px;
+            background: var(--neon-green); border-radius: 50%;
+            animation: pulse-live 1.8s ease-in-out infinite;
+            box-shadow: 0 0 6px var(--neon-green); flex-shrink: 0;
+        }
+
+        /* ── MAIN ANALYTICS AREA ── */
+        .analytics-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Page header bar */
+        .page-header {
+            padding: 0.9rem 1.75rem;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            gap: 1rem;
+        }
+        .page-title {
+            font-size: 1rem; font-weight: 800;
+            background: linear-gradient(90deg, var(--neon-green), var(--neon-cyan));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        .threshold-legend {
+            display: flex; align-items: center; gap: 1.25rem;
+            font-size: 0.72rem; font-weight: 700; color: var(--text-muted);
+        }
+        .tleg-item { display: flex; align-items: center; gap: 0.4rem; }
+        .tleg-line {
+            width: 20px; height: 2px;
+            background: repeating-linear-gradient(90deg, currentColor 0, currentColor 4px, transparent 4px, transparent 8px);
+        }
+
+        /* Scrollable body */
+        .analytics-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem 1.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+        .analytics-body::-webkit-scrollbar { width: 6px; }
+        .analytics-body::-webkit-scrollbar-track { background: transparent; }
+        .analytics-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 9999px; }
+
+        /* Summary stat cards */
+        .summary-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+        }
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.1rem 1.25rem;
+            display: flex; flex-direction: column; gap: 0.3rem;
+            position: relative; overflow: hidden;
+            transition: border-color 0.2s;
+        }
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 2px;
+            background: var(--card-accent, var(--neon-orange));
+            opacity: 0.8;
+        }
+        .stat-label {
+            font-size: 0.65rem; font-weight: 800; text-transform: uppercase;
+            letter-spacing: 0.12em; color: var(--text-muted);
+        }
+        .stat-value {
+            font-size: 2rem; font-weight: 900;
+            color: var(--card-accent, var(--neon-orange));
+            line-height: 1.1; font-variant-numeric: tabular-nums;
+        }
+        .stat-sub { font-size: 0.73rem; color: var(--text-muted); }
+        .stat-badge {
+            display: inline-flex; align-items: center; gap: 0.25rem;
+            font-size: 0.65rem; font-weight: 800; text-transform: uppercase;
+            padding: 0.15rem 0.5rem; border-radius: 9999px;
+            position: absolute; top: 0.85rem; right: 0.85rem;
+        }
+
+        /* Alert banners */
+        .alerts { display: flex; flex-direction: column; gap: 0.5rem; }
+        .alert-banner {
+            display: flex; align-items: center; gap: 0.75rem;
+            padding: 0.65rem 1rem;
+            border-radius: 0.6rem;
+            border-left: 3px solid;
+            font-size: 0.83rem; font-weight: 600;
+            animation: alert-in 0.3s ease;
+        }
+        @keyframes alert-in {
+            from { opacity: 0; transform: translateX(-8px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+        .alert-critical {
+            background: rgba(255,45,120,0.08);
+            border-color: var(--neon-pink);
+            color: var(--neon-pink);
+        }
+        .alert-warning {
+            background: rgba(255,217,61,0.07);
+            border-color: var(--neon-gold);
+            color: var(--neon-gold);
+        }
+        .alert-ok {
+            background: rgba(0,255,136,0.07);
+            border-color: var(--neon-green);
+            color: var(--neon-green);
+        }
+
+        /* Chart grid */
+        .chart-row {
+            display: grid;
+            gap: 1.25rem;
+        }
+        .chart-row-2 { grid-template-columns: 3fr 2fr; }
+        .chart-row-1 { grid-template-columns: 1fr; }
+
+        .chart-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.25rem 1.5rem;
+            display: flex; flex-direction: column; gap: 0.85rem;
+        }
+        .chart-header {
+            display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
+        }
+        .chart-title {
+            font-size: 0.85rem; font-weight: 800; color: var(--text-main);
+        }
+        .chart-sub {
+            font-size: 0.72rem; color: var(--text-muted); margin-top: 0.1rem;
+        }
+        .chart-badges { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+        .c-badge {
+            font-size: 0.62rem; font-weight: 800; padding: 0.18rem 0.55rem;
+            border-radius: 9999px; border: 1px solid; white-space: nowrap;
+        }
+        .chart-wrap {
+            position: relative;
+        }
+        /* Fixed height containers so charts don't collapse */
+        .chart-wrap.h-240 { height: 240px; }
+        .chart-wrap.h-280 { height: 280px; }
+        .chart-wrap.h-200 { height: 200px; }
+
+        /* ── AUTH MODAL ── */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(6px); z-index: 2000; align-items: center; justify-content: center; }
+        .modal-overlay.open { display: flex; }
+        .modal { background: var(--bg-elevated); border: 1px solid rgba(255,255,255,0.1); border-radius: 1.25rem; padding: 2rem; width: min(400px, 94vw); display: flex; flex-direction: column; gap: 1.1rem; box-shadow: 0 30px 80px rgba(0,0,0,0.7); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; }
+        .modal-header h2 { font-size: 1.15rem; font-weight: 800; }
+        .btn-close { background: none; border: 1px solid var(--border); color: var(--text-muted); font-size: 1rem; cursor: pointer; border-radius: 0.5rem; padding: 0.3rem 0.6rem; transition: all 0.15s; }
+        .btn-close:hover { border-color: var(--neon-pink); color: var(--neon-pink); }
+        .auth-tabs { display: flex; background: var(--bg-main); border-radius: 0.75rem; padding: 0.25rem; gap: 0.25rem; }
+        .auth-tab { flex: 1; padding: 0.6rem; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.9rem; font-weight: 600; border-radius: 0.5rem; transition: all 0.15s; }
+        .auth-tab.active { background: linear-gradient(135deg, var(--neon-orange), var(--neon-pink)); color: white; }
+        .field { display: flex; flex-direction: column; gap: 0.4rem; }
+        .field label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); font-weight: 600; }
+        .field input { background: var(--bg-main); border: 1px solid rgba(255,255,255,0.1); border-radius: 0.6rem; color: var(--text-main); padding: 0.65rem 0.9rem; font-size: 0.9rem; outline: none; width: 100%; font-family: inherit; transition: border-color 0.15s; }
+        .field input:focus { border-color: var(--neon-orange); box-shadow: 0 0 0 3px rgba(255,94,26,0.1); }
+        .btn-auth { padding: 0.85rem; background: linear-gradient(135deg, var(--neon-orange) 0%, var(--neon-pink) 100%); color: white; border: none; border-radius: 0.75rem; font-size: 0.95rem; font-weight: 800; cursor: pointer; transition: transform 0.15s; box-shadow: 0 4px 20px rgba(255,94,26,0.3); font-family: inherit; }
+        .btn-auth:hover { transform: translateY(-1px); }
+        .btn-auth:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+        .form-msg { font-size: 0.825rem; text-align: center; }
+        .form-msg.error   { color: var(--neon-pink); }
+        .form-msg.success { color: var(--neon-green); }
+    </style>
+</head>
+<body>
+<div class="app-container">
+
+    <!-- ── SIDEBAR ── -->
+    <aside class="sidebar">
+        <div>
+            <div class="logo">CIVIC.OS</div>
+            <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:1.75rem;">
+                <span class="live-dot"></span>
+                <span style="font-size:0.62rem;font-weight:700;letter-spacing:0.14em;color:var(--neon-green);text-transform:uppercase;">System Live</span>
+            </div>
+            <ul class="nav-links">
+                <li><a class="nav-item" href="index.html">&#9632; Dashboard</a></li>
+                <li><a class="nav-item active" href="analytics.html">&#9651; Analytics</a></li>
+                <li><a class="nav-item" href="gallery.html">&#9728; Gallery<span class="new-badge" id="galleryBadge"></span></a></li>
+                <li><a class="nav-item" href="map.html">&#9678; Regional Map</a></li>
+            </ul>
+        </div>
+        <div class="sidebar-bottom">
+            <div class="auth-area" id="authArea">
+                <button class="btn-login" id="openAuthBtn">&#128274; Login / Sign Up</button>
+            </div>
+            <a class="btn-add" href="index.html">&#43; File a Report</a>
+        </div>
+    </aside>
+
+    <!-- ── ANALYTICS AREA ── -->
+    <div class="analytics-area">
+
+        <div class="page-header">
+            <div>
+                <div class="page-title">&#9651; Analytics &amp; Thresholds</div>
+            </div>
+            <div class="threshold-legend">
+                <div class="tleg-item" style="color:var(--neon-gold);">
+                    <div class="tleg-line"></div> Warning
+                </div>
+                <div class="tleg-item" style="color:var(--neon-pink);">
+                    <div class="tleg-line"></div> Critical
+                </div>
+            </div>
+        </div>
+
+        <div class="analytics-body">
+
+            <!-- Summary cards -->
+            <div class="summary-row">
+                <div class="stat-card" style="--card-accent:var(--neon-orange);">
+                    <div class="stat-label">Total Reports</div>
+                    <div class="stat-value" id="sum-total">—</div>
+                    <div class="stat-sub">all time</div>
+                </div>
+                <div class="stat-card" style="--card-accent:var(--neon-cyan);">
+                    <div class="stat-label">Today</div>
+                    <div class="stat-value" id="sum-today">—</div>
+                    <div class="stat-sub">in the last 24 h</div>
+                    <div class="stat-badge" id="today-badge" style="display:none;"></div>
+                </div>
+                <div class="stat-card" style="--card-accent:var(--neon-purple);">
+                    <div class="stat-label">This Week</div>
+                    <div class="stat-value" id="sum-week">—</div>
+                    <div class="stat-sub">last 7 days</div>
+                </div>
+                <div class="stat-card" style="--card-accent:var(--neon-green);">
+                    <div class="stat-label">Resolution Rate</div>
+                    <div class="stat-value" id="sum-rate">—</div>
+                    <div class="stat-sub" id="sum-rate-sub">resolved / total</div>
+                    <div class="stat-badge" id="rate-badge" style="display:none;"></div>
+                </div>
+            </div>
+
+            <!-- Alert banners (populated by JS) -->
+            <div class="alerts" id="alertsBox"></div>
+
+            <!-- Row 1: Category breakdown + Status doughnut -->
+            <div class="chart-row chart-row-2">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">Category Breakdown</div>
+                            <div class="chart-sub">Total reports per category with alert thresholds</div>
+                        </div>
+                        <div class="chart-badges">
+                            <span class="c-badge" style="color:var(--neon-gold);border-color:rgba(255,217,61,0.35);">&#9888; Warning &gt;10</span>
+                            <span class="c-badge" style="color:var(--neon-pink);border-color:rgba(255,45,120,0.35);">&#9940; Critical &gt;25</span>
+                        </div>
+                    </div>
+                    <div class="chart-wrap h-240"><canvas id="chartCategory"></canvas></div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">Status Distribution</div>
+                            <div class="chart-sub">Current resolution pipeline</div>
+                        </div>
+                    </div>
+                    <div class="chart-wrap h-240" style="display:flex;align-items:center;justify-content:center;">
+                        <canvas id="chartStatus"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Row 2: 14-day daily trend (full width) -->
+            <div class="chart-row chart-row-1">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">Daily Report Volume — Last 14 Days</div>
+                            <div class="chart-sub">Reports submitted per day with daily load thresholds</div>
+                        </div>
+                        <div class="chart-badges">
+                            <span class="c-badge" style="color:var(--neon-gold);border-color:rgba(255,217,61,0.35);">&#9888; Warning &gt;5/day</span>
+                            <span class="c-badge" style="color:var(--neon-pink);border-color:rgba(255,45,120,0.35);">&#9940; Critical &gt;15/day</span>
+                        </div>
+                    </div>
+                    <div class="chart-wrap h-200"><canvas id="chartTrend"></canvas></div>
+                </div>
+            </div>
+
+            <!-- Row 3: Per-category trend (full width) -->
+            <div class="chart-row chart-row-1">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">Category Trend — Last 14 Days</div>
+                            <div class="chart-sub">Daily reports per category over time</div>
+                        </div>
+                    </div>
+                    <div class="chart-wrap h-200"><canvas id="chartCatTrend"></canvas></div>
+                </div>
+            </div>
+
+        </div><!-- /analytics-body -->
+    </div><!-- /analytics-area -->
+</div><!-- /app-container -->
+
+<!-- Auth Modal -->
+<div class="modal-overlay" id="authOverlay">
+    <div class="modal">
+        <div class="modal-header">
+            <h2 id="authTitle">Welcome to CIVIC.OS</h2>
+            <button class="btn-close" id="closeAuthBtn">&#x2715;</button>
+        </div>
+        <div class="auth-tabs">
+            <button class="auth-tab active" id="tabLogin" onclick="switchTab('login')">Login</button>
+            <button class="auth-tab" id="tabSignup" onclick="switchTab('signup')">Sign Up</button>
+        </div>
+        <div class="field"><label>Username</label><input type="text" id="authUsername" placeholder="e.g. civic_hero" autocomplete="username"></div>
+        <div class="field"><label>Password</label><input type="password" id="authPassword" placeholder="Min 6 characters" autocomplete="current-password"></div>
+        <button class="btn-auth" id="authSubmitBtn">Login</button>
+        <div class="form-msg" id="authMsg"></div>
+    </div>
+</div>
+
+<script>
+// ── AUTH ──────────────────────────────────────────────────────────────────────
+let _token    = localStorage.getItem('civic_token')    || '';
+let _username = localStorage.getItem('civic_username') || '';
+let _authMode = 'login';
+
+function renderAuthArea() {
+    const area = document.getElementById('authArea');
+    if (_token) {
+        area.innerHTML = `
+            <div class="user-pill">
+                <div class="user-avatar">${_username.charAt(0).toUpperCase()}</div>
+                <span class="user-name">${_username}</span>
+                <button class="btn-logout" id="logoutBtn">&#x2715;</button>
+            </div>
+            <button class="btn-login" id="openAuthBtn" style="font-size:0.78rem;color:var(--text-muted);">&#128274; Switch account</button>`;
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            _token = ''; _username = '';
+            localStorage.removeItem('civic_token');
+            localStorage.removeItem('civic_username');
+            renderAuthArea();
+        });
+    } else {
+        area.innerHTML = `<button class="btn-login" id="openAuthBtn">&#128274; Login / Sign Up</button>`;
+    }
+    document.getElementById('openAuthBtn').addEventListener('click',
+        () => document.getElementById('authOverlay').classList.add('open'));
+}
+renderAuthArea();
+
+function switchTab(mode) {
+    _authMode = mode;
+    document.getElementById('tabLogin').classList.toggle('active', mode === 'login');
+    document.getElementById('tabSignup').classList.toggle('active', mode === 'signup');
+    document.getElementById('authSubmitBtn').textContent = mode === 'login' ? 'Login' : 'Create Account';
+    document.getElementById('authTitle').textContent    = mode === 'login' ? 'Welcome Back' : 'Create Account';
+    document.getElementById('authMsg').textContent = '';
+}
+document.getElementById('closeAuthBtn').addEventListener('click',
+    () => document.getElementById('authOverlay').classList.remove('open'));
+document.getElementById('authOverlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('authOverlay'))
+        document.getElementById('authOverlay').classList.remove('open');
+});
+document.getElementById('authSubmitBtn').addEventListener('click', async () => {
+    const username = document.getElementById('authUsername').value.trim();
+    const password = document.getElementById('authPassword').value;
+    const msgEl = document.getElementById('authMsg');
+    const btn   = document.getElementById('authSubmitBtn');
+    if (!username || !password) { msgEl.textContent = 'Fill in both fields.'; msgEl.className = 'form-msg error'; return; }
+    btn.disabled = true; msgEl.textContent = '…'; msgEl.className = 'form-msg';
+    try {
+        const res  = await fetch(`/api/auth/${_authMode}`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username,password}) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Error');
+        _token = data.token; _username = data.username;
+        localStorage.setItem('civic_token', _token);
+        localStorage.setItem('civic_username', _username);
+        renderAuthArea();
+        document.getElementById('authOverlay').classList.remove('open');
+    } catch(e) { msgEl.textContent = e.message; msgEl.className = 'form-msg error'; }
+    finally    { btn.disabled = false; }
+});
+['authUsername','authPassword'].forEach(id =>
+    document.getElementById(id).addEventListener('keydown', e => {
+        if (e.key === 'Enter') document.getElementById('authSubmitBtn').click();
+    })
+);
+
+// Gallery badge
+function checkGalleryBadge(reports) {
+    const lastVisit = parseInt(localStorage.getItem('gallery_last_visit') || '0', 10);
+    const cutoff    = Date.now() - 24 * 60 * 60 * 1000;
+    const hasNew    = reports.some(r => {
+        const t = new Date(r.created_at).getTime();
+        return t > cutoff && t > lastVisit;
+    });
+    const badge = document.getElementById('galleryBadge');
+    if (badge) badge.classList.toggle('show', hasNew);
+}
+
+// ── CHART DEFAULTS ────────────────────────────────────────────────────────────
+Chart.defaults.color          = '#6b7a99';
+Chart.defaults.borderColor    = 'rgba(255,255,255,0.07)';
+Chart.defaults.font.family    = "'Inter', system-ui, sans-serif";
+Chart.defaults.font.size      = 12;
+
+// ── THRESHOLDS (edit these to change alert levels) ────────────────────────────
+const TH = {
+    catWarning:    10,   // per-category warning
+    catCritical:   25,   // per-category critical
+    dailyWarning:   5,   // reports/day warning
+    dailyCritical: 15,   // reports/day critical
+    rateWarning:   30,   // resolution rate % warning (below = warn)
+};
+
+// ── CONSTANTS ─────────────────────────────────────────────────────────────────
+const CAT_KEYS   = ['street_damage', 'water_leakage', 'waste_management', 'other_infra'];
+const CAT_LABELS = { street_damage:'Street Damage', water_leakage:'Water Leakage', waste_management:'Waste Mgmt', other_infra:'Other Infra' };
+const CAT_COLORS = { street_damage:'#ff5e1a', water_leakage:'#00d4ff', waste_management:'#00ff88', other_infra:'#c084fc' };
+const STATUS_LABELS = { open:'Open', in_progress:'In Progress', resolved:'Resolved' };
+const STATUS_COLORS = { open:'#ff2d78', in_progress:'#ffd93d', resolved:'#00ff88' };
+
+// ── DATE HELPERS ──────────────────────────────────────────────────────────────
+function isoDay(date) { return date.toISOString().slice(0, 10); }
+
+function last14Days() {
+    return Array.from({ length: 14 }, (_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - (13 - i));
+        return isoDay(d);
+    });
+}
+
+function shortDate(isoStr) {
+    const [, m, d] = isoStr.split('-');
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${months[parseInt(m)-1]} ${parseInt(d)}`;
+}
+
+// ── CHART INSTANCES ───────────────────────────────────────────────────────────
+let chartCategory = null;
+let chartStatus   = null;
+let chartTrend    = null;
+let chartCatTrend = null;
+
+// Doughnut centre-text plugin
+const doughnutCentre = {
+    id: 'doughnutCentre',
+    afterDraw(chart) {
+        if (chart.config.type !== 'doughnut') return;
+        const { ctx, chartArea } = chart;
+        if (!chartArea) return;
+        const cx = (chartArea.left + chartArea.right) / 2;
+        const cy = (chartArea.top  + chartArea.bottom) / 2;
+        ctx.save();
+        ctx.textAlign    = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font         = '800 1.5rem Inter, sans-serif';
+        ctx.fillStyle    = '#f0f6ff';
+        ctx.fillText(chart.config.data._total ?? '', cx, cy - 9);
+        ctx.font      = '700 0.65rem Inter, sans-serif';
+        ctx.fillStyle = '#6b7a99';
+        ctx.letterSpacing = '0.1em';
+        ctx.fillText('TOTAL', cx, cy + 12);
+        ctx.restore();
+    }
+};
+Chart.register(doughnutCentre);
+
+// ── BUILD CHARTS ──────────────────────────────────────────────────────────────
+
+function buildCategoryChart(stats) {
+    const data   = CAT_KEYS.map(k => stats[k] || 0);
+    const colors = CAT_KEYS.map(k => CAT_COLORS[k]);
+    const ctx    = document.getElementById('chartCategory').getContext('2d');
+    if (chartCategory) chartCategory.destroy();
+    chartCategory = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: CAT_KEYS.map(k => CAT_LABELS[k]),
+            datasets: [{
+                label: 'Reports',
+                data,
+                backgroundColor: colors.map(c => c + '99'),  // ~60% alpha
+                borderColor: colors,
+                borderWidth: 2,
+                borderRadius: 6,
+                borderSkipped: false,
+            }],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#111827',
+                    borderColor: 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
+                    padding: 12,
+                    callbacks: {
+                        label: ctx => ` ${ctx.parsed.y} reports`,
+                        afterLabel: ctx => {
+                            const v = ctx.parsed.y;
+                            if (v > TH.catCritical)  return '  ⛔ CRITICAL';
+                            if (v > TH.catWarning)   return '  ⚠ Warning';
+                            return '  ✓ Normal';
+                        }
+                    }
+                },
+                annotation: {
+                    annotations: {
+                        warningLine: {
+                            type: 'line',
+                            yMin: TH.catWarning, yMax: TH.catWarning,
+                            borderColor: '#ffd93d',
+                            borderWidth: 1.5,
+                            borderDash: [6, 4],
+                            label: {
+                                display: true,
+                                content: `⚠ Warning (${TH.catWarning})`,
+                                color: '#ffd93d',
+                                backgroundColor: 'rgba(6,8,15,0.88)',
+                                font: { size: 10, weight: '700' },
+                                position: 'end',
+                                padding: { x: 7, y: 3 },
+                                borderRadius: 4,
+                            }
+                        },
+                        criticalLine: {
+                            type: 'line',
+                            yMin: TH.catCritical, yMax: TH.catCritical,
+                            borderColor: '#ff2d78',
+                            borderWidth: 1.5,
+                            borderDash: [6, 4],
+                            label: {
+                                display: true,
+                                content: `⛔ Critical (${TH.catCritical})`,
+                                color: '#ff2d78',
+                                backgroundColor: 'rgba(6,8,15,0.88)',
+                                font: { size: 10, weight: '700' },
+                                position: 'end',
+                                padding: { x: 7, y: 3 },
+                                borderRadius: 4,
+                            }
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    ticks: { font: { size: 11, weight: '600' } },
+                },
+                y: {
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    ticks: { stepSize: 1 },
+                    beginAtZero: true,
+                    suggestedMax: Math.max(...data, TH.catCritical) + 3,
+                }
+            }
+        }
+    });
+}
+
+function buildStatusChart(reports) {
+    const counts = { open: 0, in_progress: 0, resolved: 0 };
+    reports.forEach(r => { if (counts[r.status] !== undefined) counts[r.status]++; });
+    const labels = Object.keys(STATUS_LABELS).filter(k => counts[k] > 0);
+    const data   = labels.map(k => counts[k]);
+    const ctx    = document.getElementById('chartStatus').getContext('2d');
+    if (chartStatus) chartStatus.destroy();
+    const cfg = {
+        type: 'doughnut',
+        data: {
+            _total: reports.length,
+            labels: labels.map(k => STATUS_LABELS[k]),
+            datasets: [{
+                data,
+                backgroundColor: labels.map(k => STATUS_COLORS[k] + 'cc'),
+                borderColor:     labels.map(k => STATUS_COLORS[k]),
+                borderWidth: 2,
+                hoverOffset: 6,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            cutout: '65%',
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 16,
+                        usePointStyle: true,
+                        pointStyle: 'circle',
+                        font: { size: 11, weight: '600' },
+                    }
+                },
+                tooltip: {
+                    backgroundColor: '#111827',
+                    borderColor: 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
+                    padding: 12,
+                    callbacks: {
+                        label: ctx => {
+                            const pct = reports.length ? Math.round((ctx.parsed / reports.length) * 100) : 0;
+                            return ` ${ctx.parsed} reports (${pct}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    };
+    chartStatus = new Chart(ctx, cfg);
+}
+
+function buildTrendChart(reports) {
+    const days  = last14Days();
+    const byDay = {};
+    reports.forEach(r => {
+        const d = r.created_at.slice(0, 10);
+        byDay[d] = (byDay[d] || 0) + 1;
+    });
+    const values = days.map(d => byDay[d] || 0);
+    const ctx    = document.getElementById('chartTrend').getContext('2d');
+    if (chartTrend) chartTrend.destroy();
+
+    const gradFill = ctx.createLinearGradient(0, 0, 0, 200);
+    gradFill.addColorStop(0,   'rgba(0,212,255,0.25)');
+    gradFill.addColorStop(1,   'rgba(0,212,255,0)');
+
+    chartTrend = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: days.map(shortDate),
+            datasets: [{
+                label: 'Reports',
+                data: values,
+                borderColor: '#00d4ff',
+                borderWidth: 2,
+                pointBackgroundColor: '#00d4ff',
+                pointRadius: 4,
+                pointHoverRadius: 7,
+                fill: true,
+                backgroundColor: gradFill,
+                tension: 0.35,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#111827',
+                    borderColor: 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
+                    padding: 12,
+                    callbacks: {
+                        label: ctx => ` ${ctx.parsed.y} report${ctx.parsed.y !== 1 ? 's' : ''}`,
+                        afterLabel: ctx => {
+                            const v = ctx.parsed.y;
+                            if (v > TH.dailyCritical) return '  ⛔ CRITICAL load';
+                            if (v > TH.dailyWarning)  return '  ⚠ High load';
+                            return '  ✓ Normal';
+                        }
+                    }
+                },
+                annotation: {
+                    annotations: {
+                        warnDay: {
+                            type: 'line',
+                            yMin: TH.dailyWarning, yMax: TH.dailyWarning,
+                            borderColor: '#ffd93d',
+                            borderWidth: 1.5,
+                            borderDash: [6, 4],
+                            label: {
+                                display: true,
+                                content: `⚠ ${TH.dailyWarning}/day`,
+                                color: '#ffd93d',
+                                backgroundColor: 'rgba(6,8,15,0.88)',
+                                font: { size: 10, weight: '700' },
+                                position: 'end',
+                                padding: { x: 7, y: 3 },
+                                borderRadius: 4,
+                            }
+                        },
+                        critDay: {
+                            type: 'line',
+                            yMin: TH.dailyCritical, yMax: TH.dailyCritical,
+                            borderColor: '#ff2d78',
+                            borderWidth: 1.5,
+                            borderDash: [6, 4],
+                            label: {
+                                display: true,
+                                content: `⛔ ${TH.dailyCritical}/day`,
+                                color: '#ff2d78',
+                                backgroundColor: 'rgba(6,8,15,0.88)',
+                                font: { size: 10, weight: '700' },
+                                position: 'end',
+                                padding: { x: 7, y: 3 },
+                                borderRadius: 4,
+                            }
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    ticks: { font: { size: 10 }, maxRotation: 30 },
+                },
+                y: {
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    ticks: { stepSize: 1 },
+                    beginAtZero: true,
+                    suggestedMax: Math.max(...values, TH.dailyCritical) + 2,
+                }
+            }
+        }
+    });
+}
+
+function buildCatTrendChart(reports) {
+    const days = last14Days();
+
+    const datasets = CAT_KEYS.map(k => {
+        const byDay = {};
+        reports.filter(r => r.category === k).forEach(r => {
+            const d = r.created_at.slice(0, 10);
+            byDay[d] = (byDay[d] || 0) + 1;
+        });
+        const col = CAT_COLORS[k];
+        return {
+            label: CAT_LABELS[k],
+            data: days.map(d => byDay[d] || 0),
+            borderColor: col,
+            backgroundColor: col + '22',
+            borderWidth: 2,
+            pointBackgroundColor: col,
+            pointRadius: 3,
+            pointHoverRadius: 6,
+            fill: false,
+            tension: 0.35,
+        };
+    });
+
+    const ctx = document.getElementById('chartCatTrend').getContext('2d');
+    if (chartCatTrend) chartCatTrend.destroy();
+    chartCatTrend = new Chart(ctx, {
+        type: 'line',
+        data: { labels: days.map(shortDate), datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 16, usePointStyle: true, pointStyle: 'circle',
+                        font: { size: 11, weight: '600' },
+                    }
+                },
+                tooltip: {
+                    backgroundColor: '#111827',
+                    borderColor: 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
+                    padding: 12,
+                },
+                annotation: { annotations: {} }
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    ticks: { font: { size: 10 }, maxRotation: 30 },
+                },
+                y: {
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    ticks: { stepSize: 1 },
+                    beginAtZero: true,
+                }
+            }
+        }
+    });
+}
+
+// ── SUMMARY STATS ─────────────────────────────────────────────────────────────
+function buildSummary(reports, stats) {
+    const now     = Date.now();
+    const DAY     = 86400000;
+    const today   = reports.filter(r => now - new Date(r.created_at).getTime() < DAY).length;
+    const week    = reports.filter(r => now - new Date(r.created_at).getTime() < 7 * DAY).length;
+    const resolved = reports.filter(r => r.status === 'resolved').length;
+    const rate    = reports.length ? Math.round((resolved / reports.length) * 100) : 0;
+
+    document.getElementById('sum-total').textContent = stats.total || 0;
+    document.getElementById('sum-today').textContent = today;
+    document.getElementById('sum-week').textContent  = week;
+    document.getElementById('sum-rate').textContent  = rate + '%';
+    document.getElementById('sum-rate-sub').textContent = `${resolved} of ${reports.length} resolved`;
+
+    // Today badge
+    const todayBadge = document.getElementById('today-badge');
+    if (today > TH.dailyCritical) {
+        todayBadge.style.display = 'inline-flex';
+        todayBadge.textContent   = '⛔ Critical';
+        todayBadge.style.cssText += ';background:rgba(255,45,120,0.15);color:#ff2d78;border:1px solid rgba(255,45,120,0.3);';
+    } else if (today > TH.dailyWarning) {
+        todayBadge.style.display = 'inline-flex';
+        todayBadge.textContent   = '⚠ High';
+        todayBadge.style.cssText += ';background:rgba(255,217,61,0.1);color:#ffd93d;border:1px solid rgba(255,217,61,0.3);';
+    }
+
+    // Resolution rate badge
+    const rateBadge = document.getElementById('rate-badge');
+    if (rate < TH.rateWarning) {
+        rateBadge.style.display = 'inline-flex';
+        rateBadge.textContent   = '⚠ Backlog';
+        rateBadge.style.cssText += ';background:rgba(255,217,61,0.1);color:#ffd93d;border:1px solid rgba(255,217,61,0.3);';
+    }
+}
+
+// ── ALERTS ────────────────────────────────────────────────────────────────────
+function buildAlerts(reports, stats) {
+    const alerts = [];
+    const now    = Date.now();
+    const DAY    = 86400000;
+
+    // Per-category thresholds
+    CAT_KEYS.forEach(k => {
+        const v = stats[k] || 0;
+        if (v > TH.catCritical) {
+            alerts.push({ level: 'critical', msg: `⛔ ${CAT_LABELS[k]} has exceeded the critical threshold — ${v} reports (limit: ${TH.catCritical})` });
+        } else if (v > TH.catWarning) {
+            alerts.push({ level: 'warning',  msg: `⚠ ${CAT_LABELS[k]} is approaching critical — ${v} reports (warning: ${TH.catWarning})` });
+        }
+    });
+
+    // Daily volume
+    const today = reports.filter(r => now - new Date(r.created_at).getTime() < DAY).length;
+    if (today > TH.dailyCritical) {
+        alerts.push({ level: 'critical', msg: `⛔ ${today} reports today — daily critical threshold (${TH.dailyCritical}/day) exceeded` });
+    } else if (today > TH.dailyWarning) {
+        alerts.push({ level: 'warning',  msg: `⚠ ${today} reports today — above daily warning threshold (${TH.dailyWarning}/day)` });
+    }
+
+    // Resolution rate
+    const resolved = reports.filter(r => r.status === 'resolved').length;
+    const rate = reports.length ? Math.round((resolved / reports.length) * 100) : 100;
+    if (reports.length > 0 && rate < TH.rateWarning) {
+        alerts.push({ level: 'warning', msg: `⚠ Resolution rate is ${rate}% — below ${TH.rateWarning}% target; ${reports.length - resolved} reports still open` });
+    }
+
+    // All clear
+    if (alerts.length === 0 && reports.length > 0) {
+        alerts.push({ level: 'ok', msg: '✓ All metrics within normal range' });
+    }
+
+    const box = document.getElementById('alertsBox');
+    box.innerHTML = alerts.map(a => `
+        <div class="alert-banner alert-${a.level}">${a.msg}</div>`).join('');
+}
+
+// ── MAIN LOAD ─────────────────────────────────────────────────────────────────
+async function loadAnalytics() {
+    try {
+        const [reports, stats] = await Promise.all([
+            fetch('/api/reports?limit=500').then(r => r.json()),
+            fetch('/api/reports/stats').then(r => r.json()),
+        ]);
+
+        checkGalleryBadge(reports);
+        buildSummary(reports, stats);
+        buildAlerts(reports, stats);
+        buildCategoryChart(stats);
+        buildStatusChart(reports);
+        buildTrendChart(reports);
+        buildCatTrendChart(reports);
+
+    } catch(e) {
+        console.error('Analytics load error:', e);
+        document.getElementById('alertsBox').innerHTML =
+            '<div class="alert-banner alert-critical">⛔ Failed to load analytics data</div>';
+    }
+}
+
+loadAnalytics();
+</script>
+</body>
+</html>
