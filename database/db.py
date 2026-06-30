@@ -5,6 +5,7 @@ To switch to MongoDB later:
   2. Replace this file with the Motor version (keep the same function signatures)
   3. No other files need to change.
 """
+import random
 import uuid
 from collections import Counter
 from datetime import datetime, timezone
@@ -14,10 +15,16 @@ _reports: List[Dict] = []
 _users: Dict[str, Dict] = {}   # username -> {username, password_hash}
 
 
+def _make_issue_id() -> str:
+    """Generate a short human-readable ID like #A3F2."""
+    return '#' + ''.join(random.choices('0123456789ABCDEFGHJKLMNPQRSTUVWXYZ', k=4))
+
+
 # ── Reports ──────────────────────────────────────────────────────────────────
 
 async def insert_report(doc: dict) -> str:
-    doc["_id"] = str(uuid.uuid4())
+    doc["_id"]      = str(uuid.uuid4())
+    doc["issue_id"] = _make_issue_id()
     doc["created_at"] = datetime.now(timezone.utc).isoformat()
     _reports.append(doc)
     return doc["_id"]
@@ -26,6 +33,15 @@ async def insert_report(doc: dict) -> str:
 async def get_reports(category: Optional[str] = None, limit: int = 20) -> List[Dict]:
     data = _reports if not category else [r for r in _reports if r["category"] == category]
     return list(reversed(data))[:limit]
+
+
+async def close_report(report_id: str) -> Optional[Dict]:
+    for r in _reports:
+        if r["_id"] == report_id:
+            r["status"]    = "resolved"
+            r["closed_at"] = datetime.now(timezone.utc).isoformat()
+            return r
+    return None
 
 
 async def get_stats() -> dict:
