@@ -420,6 +420,17 @@
         .scoreboard-table th { color: var(--text-muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; }
         .scoreboard-table tr:last-child td { border-bottom: none; }
         .scoreboard-table tr:hover td { background: rgba(255,255,255,0.02); }
+        .btn-close-issue {
+            padding: 0.22rem 0.6rem;
+            background: rgba(255,45,120,0.08);
+            border: 1px solid rgba(255,45,120,0.28);
+            border-radius: 0.4rem;
+            color: var(--neon-pink);
+            font-size: 0.7rem; font-weight: 700;
+            cursor: pointer; transition: all 0.15s; font-family: inherit;
+        }
+        .btn-close-issue:hover { background: rgba(255,45,120,0.18); border-color: var(--neon-pink); }
+        .btn-close-issue:disabled { opacity: 0.4; cursor: not-allowed; }
 
         .status-badge {
             display: inline-block;
@@ -750,15 +761,17 @@
                 <table class="scoreboard-table">
                     <thead>
                         <tr>
+                            <th>ID</th>
                             <th>Reporter</th>
                             <th>Category</th>
                             <th>Location</th>
                             <th>Status</th>
                             <th>When</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody id="reportTableBody">
-                        <tr><td colspan="5" style="color:var(--text-muted);text-align:center;padding:2rem;">Loading…</td></tr>
+                        <tr><td colspan="7" style="color:var(--text-muted);text-align:center;padding:2rem;">Loading…</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -1209,15 +1222,39 @@
             const rows=await fetch('/api/reports?limit=10').then(r=>r.json());
             checkGalleryBadge(rows);
             const tb=document.getElementById('reportTableBody');
-            if(!rows.length){ tb.innerHTML='<tr><td colspan="5" style="color:var(--text-muted);text-align:center;padding:2rem;">No reports yet — file the first one!</td></tr>'; return; }
-            tb.innerHTML=rows.map(r=>`<tr>
+            if(!rows.length){ tb.innerHTML='<tr><td colspan="7" style="color:var(--text-muted);text-align:center;padding:2rem;">No reports yet — file the first one!</td></tr>'; return; }
+            tb.innerHTML=rows.map(r=>`<tr data-report-id="${r.id}">
+                <td style="font-family:monospace;font-weight:800;font-size:0.78rem;color:var(--neon-gold);letter-spacing:0.04em;">${r.issue_id||'—'}</td>
                 <td style="font-weight:700;color:var(--neon-purple);">${r.username||'—'}</td>
                 <td>${CAT_LABELS[r.category]||r.category}</td>
                 <td style="color:var(--text-muted);font-size:0.8rem;">${r.address||(r.latitude?`${(+r.latitude).toFixed(3)},${(+r.longitude).toFixed(3)}`:'—')}</td>
-                <td>${STATUS_BADGE[r.status]||r.status}</td>
+                <td class="status-cell">${STATUS_BADGE[r.status]||r.status}</td>
                 <td style="color:var(--text-muted);font-size:0.78rem;">${new Date(r.created_at).toLocaleString()}</td>
+                <td>${r.status==='resolved'
+                    ? '<span style="color:var(--text-muted);font-size:0.72rem;">Closed</span>'
+                    : (_token ? `<button class="btn-close-issue" onclick="closeReport('${r.id}',this)">&#x2715; Close</button>` : '')
+                }</td>
             </tr>`).join('');
         } catch(_){}
+    }
+
+    async function closeReport(id, btn) {
+        btn.disabled = true;
+        btn.textContent = '…';
+        try {
+            const res = await fetch(`/api/reports/${id}/close`, {
+                method: 'PATCH',
+                headers: { 'Authorization': 'Bearer ' + _token }
+            });
+            if (!res.ok) { const d=await res.json(); throw new Error(d.detail||'Error'); }
+            const row = btn.closest('tr');
+            row.querySelector('.status-cell').innerHTML = STATUS_BADGE['resolved'];
+            btn.closest('td').innerHTML = '<span style="color:var(--text-muted);font-size:0.72rem;">Closed</span>';
+            loadStats();
+        } catch(e) {
+            btn.disabled = false;
+            btn.textContent = '✕ Close';
+        }
     }
 
     async function loadLeaderboard() {
