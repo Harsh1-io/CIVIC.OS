@@ -60,6 +60,14 @@ async def get_stats():
     return await db.get_stats()
 
 
+@router.patch("/{report_id}/close")
+async def close_report(report_id: str, username: str = Depends(get_current_user)):
+    report = await db.close_report(report_id)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found.")
+    return {"id": report["_id"], **{k: v for k, v in report.items() if k != "_id"}}
+
+
 @router.get("/leaderboard")
 async def leaderboard(limit: int = 10):
     return await db.get_leaderboard(limit=limit)
